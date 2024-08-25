@@ -4,6 +4,7 @@ from scipy.optimize import curve_fit
 from scipy.stats import norm
 
 def gaussian(x, amplitude, mean, std_dev):                          
+    # Calculate gaussian. Normalize pdf by np.sqrt(2 * np.pi) and std_dev. This ensures peak = amplitude.
     return amplitude * np.sqrt(2 * np.pi) * std_dev * norm.pdf(x, mean, std_dev)  
 
 def measure_ion_response(pos, mean=0.5, amplitude=100, std_dev=0.01, noise_level=1):
@@ -15,7 +16,7 @@ def measure_ion_response(pos, mean=0.5, amplitude=100, std_dev=0.01, noise_level
 def move_mirror_to_position(pos):
     pass
 
-def locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_min=80, min_step_size=0.0005):
+def locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_min=80, min_step_size=0.0001):
     # Check for valid search range
     if not (0 <= start <= 1) or not (0 <= stop <= 1):
         print("Error: Start and stop values must be within the range [0, 1].")
@@ -31,11 +32,9 @@ def locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_
         print("Error: Step size must be a positive value larger than min_step_size, and less than a 1/3 of the search range.")
         return None
     
-    # Lists to store all of the data  from searches
-    all_x_data = []
-    all_y_data = []
+    
 
-    def try_gaussian_fit(x_data, y_data):        
+    def try_gaussian_fit(x_data, y_data):
         if len(x_data) < 3:
             return None
         try:
@@ -46,18 +45,26 @@ def locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_
         except RuntimeError:
             return None
 
-    # STEP 1: Initial search to find a valid fit using initial step size. 
+    # Dictionary to store all of the data from searches
+    ion_responses = {}
+    # STEP 1: Initial search to find a valid fit using initial step size
     while True:
 
+        search_direction = 1  # (1 for left to right), (-1 for right to left)
+
+        # Define search direction
+        if search_direction == 1:
+            x_vals = np.clip(np.arange(start, stop, step_size), 0, 1) # Right to left
+        else:
+            x_vals = np.clip(np.arange(stop, start, -step_size), 0, 1)  # Left to right
+
         # Gather ion response data over mirror positions
-        x_vals = np.clip(np.arange(start, stop, step_size), 0, 1)
-        ion_responses = {}
         for pos in x_vals:
-            move_mirror_to_position(pos)
-            ion_response = measure_ion_response(pos)
-            ion_responses[pos] = ion_response
-            all_x_data.append(pos)
-            all_y_data.append(ion_response)
+            if pos not in ion_responses:  # Only measure new positions
+                move_mirror_to_position(pos)
+                ion_response = measure_ion_response(pos)
+                ion_responses[pos] = ion_response
+
         x_data = np.array(list(ion_responses.keys()))
         y_data = np.array(list(ion_responses.values()))
 
@@ -67,6 +74,9 @@ def locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_
         # If we find a valid fit, break and move to STEP 2
         if popt is not None and amp_min < popt[0] <= 100:
             break
+
+        # End of current sweep. Switch the search direction for the next iteration
+        search_direction *= -1
 
         # Expand the search range if we haven't founded a valid fit with the current search parameters
         max_pos = max(ion_responses, key=ion_responses.get)
@@ -86,28 +96,35 @@ def locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_
     narrow_search_range = 2 * stddev
     start = max(0, mean - narrow_search_range)
     stop = min(1, mean + narrow_search_range)
-    # Get at least 10 data points
-    step_size = min(step_size / 2, narrow_search_range / 10)  
+    # Set step size for narrow search
+    step_size = precision
 
     # STEP 3: Refine search and validate fit and precision
     while True:
-        x_vals = np.clip(np.arange(start, stop, step_size), 0, 1)
-        ion_responses = {}
+
+        direction = 1 # (1 for left to right), (-1 for right to left)
+
+        if direction == 1:
+            x_vals = np.clip(np.arange(start, stop, step_size), 0, 1) # Right to left
+        else:
+            x_vals = np.clip(np.arange(start, stop, -step_size), 0, 1) # Left to right
+
         for pos in x_vals:
-            move_mirror_to_position(pos)
-            ion_response = measure_ion_response(pos)
-            ion_responses[pos] = ion_response
-            all_x_data.append(pos)
-            all_y_data.append(ion_response)
+            if pos not in ion_responses:  # Only measure new positions
+                move_mirror_to_position(pos)
+                ion_response = measure_ion_response(pos)
+                ion_responses[pos] = ion_response
+
         x_data = np.array(list(ion_responses.keys()))
         y_data = np.array(list(ion_responses.values()))
+        
         popt = try_gaussian_fit(x_data, y_data)
 
         # Check if we have a valid fit
         if popt is not None:
             amplitude, mean, stddev = popt
             if amp_min < amplitude <= 100 and step_size < precision:                                     
-                plot_results(all_x_data, all_y_data, popt)
+                plot_results(x_data, y_data, popt)
                 return mean
 
         # If valid fit condition or precision conditon not met, halve the step size
@@ -136,8 +153,6 @@ def plot_results(x_data, y_data, popt):
     plt.legend()  
     plt.show()  
 
-
-#########################################################################################################
 # Example call to locate_best_mirror_pos
-best_pos = locate_best_mirror_pos(start=0, stop=1, step_size=0.1)
+best_pos = locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_min=80, min_step_size=0.0001)
 print(f"Estimated optimal mirror position: {best_pos}")
