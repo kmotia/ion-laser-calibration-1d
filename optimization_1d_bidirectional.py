@@ -4,19 +4,55 @@ from scipy.optimize import curve_fit
 from scipy.stats import norm
 
 def gaussian(x, amplitude, mean, std_dev):                          
+    """
+    Gaussian function based on amplitude, mean, and standard deviation.
+    
+    Parameters:
+    x (numpy.ndarray): Mirror positions.
+    amplitude (float): The height of the Gaussian peak.
+    mean (float): The center of the peak.
+    std_dev (float): The standard deviation.
+    
+    Returns:
+    numpy.ndarray: Gaussian values at each x.
+    """
     # Calculate gaussian. Normalize pdf by np.sqrt(2 * np.pi) and std_dev. This ensures peak = amplitude.
     return amplitude * np.sqrt(2 * np.pi) * std_dev * norm.pdf(x, mean, std_dev)  
 
-def measure_ion_response(pos, mean=0.5, amplitude=100, std_dev=0.01, noise_level=1):
-    gaussian_value = amplitude * np.sqrt(2 * np.pi) * std_dev * norm.pdf(pos, mean, std_dev)
-    noisy_response = gaussian_value + np.random.normal(0, noise_level)
-    clipped_response = np.clip(noisy_response, 0, amplitude)
-    return int(round(clipped_response))
+def measure_ion_response(pos):
+    """
+    Gets the reading of an ion response for a given mirror position. (Just a stub for now).
+
+    Parameters:
+    pos (float): Mirror position.
+    """
+    pass
 
 def move_mirror_to_position(pos):
+    """
+    Placeholder function to simulate moving a mirror to a specific position. (Just a stub for now).
+    
+    Parameters:
+    pos (float): Mirror position.
+    """
     pass
 
 def locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_min=80, min_step_size=0.0001):
+    """
+    Locates the peak of the ion response by iteratively measuring and fitting a Gaussian.
+
+    Parameters:
+    start (float, optional): Starting mirror position for the scan. Default is 0.
+    stop (float, optional): Ending mirror position for the scan. Default is 1.
+    step_size (float, optional): Initial step size. Default is 0.1.
+    precision (float, optional): Desired precision for locating the optimal mirror position. Default is 0.001.
+    amp_min (float, optional): Minimum acceptable amplitude of the Gaussian fit. Default is 80.
+    min_step_size (float, optional): Minimum step size allowed during search. Default is 0.0005.
+
+    Returns:
+    float: Estimated position of the optimal mirror position with required precision, or None if the step size is too small.
+    """
+
     # Check for valid search range
     if not (0 <= start <= 1) or not (0 <= stop <= 1):
         print("Error: Start and stop values must be within the range [0, 1].")
@@ -35,6 +71,17 @@ def locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_
     
 
     def try_gaussian_fit(x_data, y_data):
+        """
+        Attempts to fit Gaussian to the ion response data.
+
+        Parameters:
+        x_data (numpy.ndarray): Array of x mirror positions.
+        y_data (numpy.ndarray): Array of ion response measurements.
+
+        Returns:
+        tuple or None: Optimal parameters of the Gaussian fit (amplitude, mean, std_dev) if successful, None otherwise.
+        """
+        
         if len(x_data) < 3:
             return None
         try:
@@ -134,6 +181,18 @@ def locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_
             return None
         
 def plot_results(x_data, y_data, popt):
+    """
+    Plots the measured ion response data and the fitted Gaussian surface.
+
+    Parameters:
+    x_data (list): The x mirror positions.
+    y_data (list): The y mirror positions.
+    z_data (list): The ion responses.
+    popt (numpy.ndarray): Optimal parameters of the Gaussian fit (amplitude, x_mean, x_stddev).
+
+    Returns:
+    None
+    """
     plt.figure(figsize=(12, 6))
     plt.scatter(x_data, y_data, label='Measured Data') 
     
@@ -154,5 +213,5 @@ def plot_results(x_data, y_data, popt):
     plt.show()  
 
 # Example call to locate_best_mirror_pos
-best_pos = locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_min=80, min_step_size=0.0001)
-print(f"Estimated optimal mirror position: {best_pos}")
+# best_pos = locate_best_mirror_pos(start=0, stop=1, step_size=0.1, precision=0.001, amp_min=80, min_step_size=0.001)
+# print(f"Estimated optimal mirror position: {best_pos}")
